@@ -1,3 +1,4 @@
 .venv
 .vscode
-info.log
+prod.log
+db.json
