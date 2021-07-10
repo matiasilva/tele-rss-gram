@@ -5,7 +5,9 @@ import yaml
 from tinydb import TinyDB
 from telegram.ext import Updater, CommandHandler, Filters, MessageHandler
 from telegram import ParseMode
-import inspect
+from datetime import datetime
+import re
+from urllib.parse import urlsplit
 
 # configure logging
 logging.basicConfig(
@@ -19,7 +21,12 @@ logging.basicConfig(
 def generate_rss_endpoint(subreddit, terms):
     # %2B is `+` url encoded
     # %3A is `:` url encoded
-    return f"https://www.reddit.com/search.rss?q={'%2B'.join(terms)}%2Bsubreddit:{subreddit}&sort=new"
+    return f"https://www.reddit.com/search.rss?q={'+'.join(terms)}+subreddit:{subreddit}&sort=new"
+
+
+def truncate(txt, len):
+    # truncate by chars or until newline hit
+    return False
 
 
 @click.group()
@@ -88,7 +95,8 @@ def remove_tg(update, context):
         update.message.reply_text("👎 must specify a doc id")
         return
 
-    id = remove(int(context.args[0]))
+    id = int(context.args[0])
+    remove(id)
     update.message.reply_text(f"✅ removed doc with id {id}")
 
 
@@ -107,11 +115,9 @@ def ls_cli():
 def ls_tg(update, context):
     results = ""
     for item in ls():
-        results += (
-            f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
-        )
+        results += f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
         results.pop()  # remove last newline
-    
+
     if results == "":
         update.message.reply_text("😢 no entries in database. add one!")
     else:
@@ -139,22 +145,45 @@ def poll_job(context):
     db = TinyDB("data.json")
 
     for item in db:
+        feedparser.RESOLVE_RELATIVE_URIS = 0
         d = feedparser.parse(item.get("feed"))
+        num_entries = len(d.entries)
+
+        # first time?
+        if not item.get("last_id"):
+            db.update({"last_id": d.entries[-1].id}, doc_ids=[item.doc_id])
+
         # sorted by new
         last_index = None
         for i in range(len(d.entries)):
             entry = d.entries[i]
             if entry.id == item.get("last_id"):
                 last_index = i
+
         new_entries = d.entries[:last_index]
+
+        # to prevent flooding, only take last 5 entries
+        if num_entries > 5:
+            new_entries = new_entries[num_entries - 1 + (-5 + 1):]
+
         # push all new entries per feed to chat
         for e in new_entries:
+            escaped_title = re.sub(r"([!.<>*_()\[\]#\\`+-])", r"\\\1", e.title)
             context.bot.send_message(
-                context.job.context, text=f"[{e.title}]({e.link})", parse_mode=ParseMode.MARKDOWN_V2
+                context.job.context,
+                text=f"*r/{item.get('subreddit')}*\n[{escaped_title}]({e.link})\n{datetime.fromisoformat(e.published).strftime('%d/%m, %H:%M:%S')}",
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True,
             )
 
+        parsed_link = urlsplit(d.feed.link)
+        to_remove = f"{parsed_link[0]}://{parsed_link[1]}/"
+
         if len(new_entries) > 0:
-            db.update({"last_id": new_entries[0].id}, doc_ids=[item.doc_id])
+            db.update({"last_id": new_entries[0].id.replace(to_remove, '')}, doc_ids=[item.doc_id])
+            logging.info(f"✅ Sent {len(new_entries)} message(s)")
+        else:
+            logging.info(f"⛔ No new message(s)")
 
 
 @cli.command(name="poll")
@@ -187,7 +216,12 @@ def poll_cli():
     # don't run the poller if our bot isn't in a group yet
     chats = TinyDB("chats.json").all()
     if len(chats) > 0:
-        job_queue.run_repeating(poll_job, interval=POLL_INTERVAL, name="poller", context=chats[0].get('chat_id'))
+        job_queue.run_repeating(
+            poll_job,
+            interval=POLL_INTERVAL,
+            name="poller",
+            context=chats[0].get("chat_id"),
+        )
         logging.info("⭐ Started polling")
 
     updater.start_polling()
