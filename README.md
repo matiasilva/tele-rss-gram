@@ -20,13 +20,28 @@ Use Python >= 3.4
 
 2. Set your Telegram token & polling interval
 
-    `nano src/config.yml`
+    ```bash
+    nano src/config.yml
+    ```
+
+    ```yaml
+    tg_bot_token:
+    poll_interval: 0.5
+    ```
 
 3. Add entries via CLI if desired
+
+    ```python
+    python3 src/main add upliftingnews cats
+    ```
 
 4. Set the bot going!
 
     ```bash
     tmux
-    python3 src/main.py poll
+    python3 src/main poll
     ```
+
+## Credits
+
+Created by Matias Silva in 2021 to get vaccinated!

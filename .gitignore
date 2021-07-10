@@ -1,4 +1,4 @@
 .venv
 .vscode
 prod.log
-db.json
+data.json
