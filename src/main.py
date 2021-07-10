@@ -122,7 +122,7 @@ def ls_tg(update, context):
     results = ""
     for item in ls():
         results += f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
-        
+
     results = results[:-1]  # remove last newline
 
     if results == "":
@@ -184,12 +184,9 @@ def poll_job(context):
             )
 
 
-
         if len(new_entries) > 0:
             db.update({"last_id": strip_url_from_entry(new_entries[0].id, d.feed.link)}, doc_ids=[item.doc_id])
             logging.info(f"✅ Sent {len(new_entries)} message(s)")
-        else:
-            logging.info(f"⛔ No new message(s)")
 
 
 @cli.command(name="poll")
