@@ -1,12 +1,6 @@
 # tele-rss-gram
 
-Polls a list of RSS feeds and pushes any new items to a Telegram group
-
-## Developing
-
-Use Python >= 3.4
-
-1. Install dependencies
+Polls a list of RSS feeds and pushes any new items to a Telegram group. Intended use case here was to subscribe to many Reddit search RSS feeds and poll each of them regularly.
 
 ## Deployment
 
@@ -42,7 +36,14 @@ Use Python >= 3.4
     python3 src/main poll
     ```
 
-Note: on first start, the bot will wait for you to add it to a group, and the chat ID will be stored. restart the bot to access its full functionality.
+Note: on first start, the bot will wait for you to add it to a group, and the chat ID will be stored in a file. Restart the bot to access its full functionality and to interact with it.
+
+## Developing
+
+* Use Python >= 3.4
+* Follow the installation process as above
+* Ensure you have `flake8` and a formatter of your choice
+* It's one big ol' script
 
 ## Credits
 
