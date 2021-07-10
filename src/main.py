@@ -29,6 +29,12 @@ def truncate(txt, len):
     return False
 
 
+def strip_url_from_entry(entry, link):
+    parsed_link = urlsplit(link)
+    to_remove = f"{parsed_link[0]}://{parsed_link[1]}/"
+    return entry.replace(to_remove, '')
+
+
 @click.group()
 def cli():
     """
@@ -116,7 +122,7 @@ def ls_tg(update, context):
     results = ""
     for item in ls():
         results += f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
-        results.pop()  # remove last newline
+        results = results[:-1]  # remove last newline
 
     if results == "":
         update.message.reply_text("😢 no entries in database. add one!")
@@ -139,12 +145,6 @@ def add_chat_tg(update, context):
 
 def poll_tg(update, context):
     poll_job(context)
-
-
-def strip_url_from_entry(entry, link):
-    parsed_link = urlsplit(link)
-    to_remove = f"{parsed_link[0]}://{parsed_link[1]}/"
-    return entry.replace(to_remove, '')
 
 
 def poll_job(context):
