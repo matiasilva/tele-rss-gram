@@ -5,6 +5,7 @@ import yaml
 from tinydb import TinyDB
 from telegram.ext import Updater, CommandHandler, Filters, MessageHandler
 from telegram import ParseMode
+import inspect
 
 # configure logging
 logging.basicConfig(
@@ -87,7 +88,7 @@ def remove_tg(update, context):
         update.message.reply_text("👎 must specify a doc id")
         return
 
-    remove(int(context.args[0]))
+    id = remove(int(context.args[0]))
     update.message.reply_text(f"✅ removed doc with id {id}")
 
 
@@ -106,11 +107,15 @@ def ls_cli():
 def ls_tg(update, context):
     results = ""
     for item in ls():
-        results.append(
+        results += (
             f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
         )
         results.pop()  # remove last newline
-    update.message.reply_text(results)
+    
+    if results == "":
+        update.message.reply_text("😢 no entries in database. add one!")
+    else:
+        update.message.reply_text(results)
 
 
 def ls():
@@ -119,10 +124,11 @@ def ls():
 
 
 def add_chat_tg(update, context):
-    if update.my_chat_member:
+    update_bot = update.message.new_chat_members[0]
+    if update_bot.is_bot and update_bot.username == context.bot.username:
         db = TinyDB("chats.json")
-        db.insert({'chat_id': update.effective_chat.id})
-        logging.info("🙋‍♂️ added new chat id, yay!")
+        db.insert({"chat_id": update.effective_chat.id})
+        logging.info(f"🙋‍♂️ added new chat id {update.effective_chat.id}, yay!")
 
 
 def poll_tg(update, context):
@@ -131,8 +137,9 @@ def poll_tg(update, context):
 
 def poll_job(context):
     db = TinyDB("data.json")
+
     for item in db:
-        d = feedparser.parse(item.get('feed'))
+        d = feedparser.parse(item.get("feed"))
         # sorted by new
         last_index = None
         for i in range(len(d.entries)):
@@ -142,10 +149,12 @@ def poll_job(context):
         new_entries = d.entries[:last_index]
         # push all new entries per feed to chat
         for e in new_entries:
-            context.bot.send_message(context.job.context, text=f'[{e.title}]({e.link})', parse_mode=ParseMode.MARKDOWN_V2)
+            context.bot.send_message(
+                context.job.context, text=f"[{e.title}]({e.link})", parse_mode=ParseMode.MARKDOWN_V2
+            )
 
         if len(new_entries) > 0:
-            db.update({'last_id': new_entries[0].id}, doc_ids=[item.doc_id])
+            db.update({"last_id": new_entries[0].id}, doc_ids=[item.doc_id])
 
 
 @cli.command(name="poll")
@@ -153,7 +162,7 @@ def poll_cli():
     """
     poll the RSS feeds
     """
-    with open("config.yml", "r") as f:
+    with open("src/config.yml", "r") as f:
         config = yaml.safe_load(f)
 
     if config is None or "tg_bot_token" not in config:
@@ -171,24 +180,30 @@ def poll_cli():
     dispatcher.add_handler(CommandHandler("add", add_tg))
     dispatcher.add_handler(CommandHandler("list", ls_tg))
     dispatcher.add_handler(CommandHandler("remove", remove_tg))
-    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, add_chat_tg))
+    dispatcher.add_handler(
+        MessageHandler(Filters.status_update.new_chat_members, add_chat_tg)
+    )
 
-    chat_id = TinyDB("chats.json").all()[0]
-    job_queue.run_repeating(poll_job, interval=POLL_INTERVAL, name="poller", context=chat_id)
+    # don't run the poller if our bot isn't in a group yet
+    chats = TinyDB("chats.json").all()
+    if len(chats) > 0:
+        job_queue.run_repeating(poll_job, interval=POLL_INTERVAL, name="poller", context=chats[0].get('chat_id'))
+        logging.info("⭐ Started polling")
 
     updater.start_polling()
-    logging.info("⭐ Started polling")
     updater.idle()
 
 
 def help_tg(update, context):
     update.message.reply_text(
-        """commands available:\n
-        /add <subreddit> <search terms>: add a new entry\n
-        /remove <id>: remove an entry\n
-        /list: list all entries\n
-        /refresh: force poll all entries\n
-        /help: view this message again cause I'm a forgetful idiot"""
+        """
+    commands available:
+    /add <subreddit> <search terms>: add a new entry
+    /remove <id>: remove an entry
+    /list: list all entries
+    /refresh: force poll all entries
+    /help: view this message again cause I'm a forgetful idiot
+    """
     )
 
 

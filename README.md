@@ -42,6 +42,8 @@ Use Python >= 3.4
     python3 src/main poll
     ```
 
+Note: on first start, the bot will wait for you to add it to a group, and the chat ID will be stored. restart the bot to access its full functionality.
+
 ## Credits
 
 Created by Matias Silva in 2021 to get vaccinated!
