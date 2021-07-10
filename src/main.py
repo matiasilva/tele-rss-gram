@@ -122,7 +122,8 @@ def ls_tg(update, context):
     results = ""
     for item in ls():
         results += f"id: {item.doc_id}, sub: {item.get('subreddit')}, terms: ({', '.join(item.get('terms'))})\n"
-        results = results[:-1]  # remove last newline
+        
+    results = results[:-1]  # remove last newline
 
     if results == "":
         update.message.reply_text("😢 no entries in database. add one!")
