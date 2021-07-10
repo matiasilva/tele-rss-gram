@@ -141,6 +141,12 @@ def poll_tg(update, context):
     poll_job(context)
 
 
+def strip_url_from_entry(entry, link):
+    parsed_link = urlsplit(link)
+    to_remove = f"{parsed_link[0]}://{parsed_link[1]}/"
+    return entry.replace(to_remove, '')
+
+
 def poll_job(context):
     db = TinyDB("data.json")
 
@@ -157,7 +163,7 @@ def poll_job(context):
         last_index = None
         for i in range(len(d.entries)):
             entry = d.entries[i]
-            if entry.id == item.get("last_id"):
+            if strip_url_from_entry(entry.id, d.feed.link) == item.get("last_id"):
                 last_index = i
 
         new_entries = d.entries[:last_index]
@@ -176,11 +182,10 @@ def poll_job(context):
                 disable_web_page_preview=True,
             )
 
-        parsed_link = urlsplit(d.feed.link)
-        to_remove = f"{parsed_link[0]}://{parsed_link[1]}/"
+
 
         if len(new_entries) > 0:
-            db.update({"last_id": new_entries[0].id.replace(to_remove, '')}, doc_ids=[item.doc_id])
+            db.update({"last_id": strip_url_from_entry(new_entries[0].id, d.feed.link)}, doc_ids=[item.doc_id])
             logging.info(f"✅ Sent {len(new_entries)} message(s)")
         else:
             logging.info(f"⛔ No new message(s)")
